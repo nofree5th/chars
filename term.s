@@ -6,6 +6,7 @@
 .global clear_screen
 
 .global hide_cursor
+.global show_cursor
 .global set_cursor_pos
 
 .global red
@@ -17,6 +18,9 @@
 
     code_hide_cursor: .ascii "\033[?25l"
     .equiv code_hide_cursor_len, . - code_hide_cursor
+
+    code_show_cursor: .ascii "\033[?25h"
+    .equiv code_show_cursor_len, . - code_show_cursor
 
     code_color_red: .ascii "\033[31m"
     .equiv code_color_len, . - code_color_red
@@ -61,6 +65,15 @@ hide_cursor:
     ret
 
 #-----------------------
+# func show_cursor
+.type show_cursor, @function
+show_cursor:
+    pushl %ebx
+    write term_fd, $code_show_cursor, $code_show_cursor_len
+    popl %ebx
+    ret
+
+#-----------------------
 # func red
 .type red, @function
 red:
@@ -81,7 +94,7 @@ set_cursor_pos:
     # \033
     movb $0x1B, set_cursor_pos_buf
     # [
-    movb $0x5B, set_cursor_pos_buf + 1 # [
+    movb $'[', set_cursor_pos_buf + 1 # [
     # y
     movl $set_cursor_pos_buf + 2, %edi
     pushw %bx
@@ -89,14 +102,14 @@ set_cursor_pos:
     popw %bx
     addl %ecx, %edi
     # ;
-    movb $0x3B, (%edi)
+    movb $';', (%edi)
     incl %edi
     # x
     movw %bx, %ax
     call itoa
     addl %ecx, %edi
     # H
-    movb $0x48, (%edi)
+    movb $'H', (%edi)
     incl %edi
     subl $set_cursor_pos_buf, %edi
     write term_fd, $set_cursor_pos_buf, %edi
