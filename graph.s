@@ -81,7 +81,7 @@ draw_rect:
     pushw %dx
     movzbw %ch, %si
     addw %si, %ax
-    decl %ax
+    dec %ax
     movzbl %cl, %ecx
     call draw_row_line
     popw %dx
@@ -109,7 +109,7 @@ draw_rect:
     pushw %dx
     movzbw %cl, %si
     addw %si, %bx
-    decl %bx
+    dec %bx
     movzbl %ch, %ecx
     movb %dh, %dl
     call draw_col_line

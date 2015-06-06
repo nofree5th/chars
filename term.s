@@ -10,7 +10,8 @@
 .global show_cursor
 .global set_cursor_pos
 
-.global red
+.global set_color_red
+.global set_color_green
 
 .data
 #=======================
@@ -23,8 +24,9 @@
     code_show_cursor: .ascii "\033[?25h"
     .equiv code_show_cursor_len, . - code_show_cursor
 
+    .equiv code_color_len, 5
     code_color_red: .ascii "\033[31m"
-    .equiv code_color_len, . - code_color_red
+    code_color_green: .ascii "\033[32m"
 
 .text
 #=======================
@@ -86,10 +88,17 @@ show_cursor:
     ret
 
 #-----------------------
-# func red
-.type red, @function
-red:
+# func set_color_red
+.type set_color_red, @function
+set_color_red:
     write term_fd, $code_color_red, $code_color_len
+    ret
+
+#-----------------------
+# func set_color_green
+.type set_color_green, @function
+set_color_green:
+    write term_fd, $code_color_green, $code_color_len
     ret
 
 #-----------------------

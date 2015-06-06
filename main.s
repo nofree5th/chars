@@ -8,9 +8,9 @@
 #=======================
     term_fd: .int 1
     term   : .asciz "/dev/tty"
-    echo_char: .byte '*'
-    echo_char_row: .word border_start_row
-    echo_char_col: .word border_start_col + area_width / 2
+    echo_char: .byte '?'
+    echo_char_row: .word BORDER_START_ROW
+    echo_char_col: .word BORDER_START_COL + AREA_WIDTH / 2
 
 .bss
 #=======================
@@ -50,6 +50,7 @@ _start:
     call game_loop
 
     # recover env
+    call clear_screen
     call show_cursor
     ioctl term_fd, $TCSETS, $old_termios
     exit $0
@@ -58,14 +59,24 @@ _start:
 # func render_border
 .type render_border, @function
 render_border:
-    call red
-    movw $border_start_row, %ax
-    movw $border_start_col, %bx
-    movb $area_width, %cl
-    movb $area_height, %ch
-    movb $border_row_char, %dl
-    movb $border_col_char, %dh
+    call set_color_red
+    movw $BORDER_START_ROW, %ax
+    movw $BORDER_START_COL, %bx
+    movb $AREA_WIDTH, %cl
+    movb $AREA_HEIGHT, %ch
+    movb $BORDER_ROW_CHAR, %dl
+    movb $BORDER_COL_CHAR, %dh
     call draw_rect
+
+    movw $BORDER_START_ROW, %ax
+    movw $BORDER_START_COL, %bx
+    movb $BORDER_CORNER_CHAR, %cl
+    call putchar
+
+    movw $BORDER_START_ROW, %ax
+    movw $(BORDER_START_COL + AREA_WIDTH - 1), %bx
+    movb $BORDER_CORNER_CHAR, %cl
+    call putchar
     ret
 
 #-----------------------
@@ -76,11 +87,12 @@ game_loop:
 game_loop_again:
     call render_border
 
+    call set_color_green
     # move echo char
-    movl $border_start_row, %si
-    movl $border_start_col, %di
-    movb $area_width, %cl
-    movb $area_height, %ch
+    movw $BORDER_START_ROW, %si
+    movw $BORDER_START_COL, %di
+    movb $AREA_WIDTH, %cl
+    movb $AREA_HEIGHT, %ch
     movw echo_char_row, %ax
     movw echo_char_col, %bx
     call next_rect_pos
@@ -90,7 +102,7 @@ game_loop_again:
     movb echo_char, %cl
     call putchar
 
-    mov $100, %eax
+    mov $50, %eax
     call msleep
 
     call getchar

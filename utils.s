@@ -68,27 +68,27 @@ itoa_exit:
 next_rect_pos:
     cmpw %si, %ax
     je next_rect_pos_at_top
-    cmpl %di, %bx
+    cmp %di, %bx
     je next_rect_pos_at_left
 
     # %dx as bottom row
-    movl %si, %dx
+    mov %si, %dx
     pushw %cx
     movzbw %ch, %cx
-    addl %cx, %dx
-    decl %dx
+    add %cx, %dx
+    dec %dx
     popw %cx
 
-    cmpl %dx, %si
+    cmp %dx, %si
     je next_rect_pos_at_bottom
 
 next_rect_pos_at_right:
-    incw %ax
-    cmpw %dx, %ax
+    inc %ax
+    cmp %dx, %ax
     jbe next_rect_pos_end
     # out of range
-    movw %dx, %ax
-    decw %bx
+    mov %dx, %ax
+    dec %bx
     jmp next_rect_pos_end
 
 next_rect_pos_at_top:
