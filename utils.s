@@ -2,6 +2,7 @@
 
 .global msleep
 .global itoa
+.global next_rect_pos
 
 .text
 #=======================
@@ -54,4 +55,71 @@ itoa_reverse_again:
     incl %edi
     jmp itoa_reverse_again
 itoa_exit:
+    ret
+
+#-----------------------
+# func next_rect_pos
+# start   : row(%si), col(%di)
+# width   : %cl
+# height  : %ch
+# current : row(%ax), col(%bx)
+# -> next : row(%ax), col(%bx)
+.type next_rect_pos, @function
+next_rect_pos:
+    cmpw %si, %ax
+    je next_rect_pos_at_top
+    cmpl %di, %bx
+    je next_rect_pos_at_left
+
+    # %dx as bottom row
+    movl %si, %dx
+    pushw %cx
+    movzbw %ch, %cx
+    addl %cx, %dx
+    decl %dx
+    popw %cx
+
+    cmpl %dx, %si
+    je next_rect_pos_at_bottom
+
+next_rect_pos_at_right:
+    incw %ax
+    cmpw %dx, %ax
+    jbe next_rect_pos_end
+    # out of range
+    movw %dx, %ax
+    decw %bx
+    jmp next_rect_pos_end
+
+next_rect_pos_at_top:
+    incw %bx
+    movzbw %cl, %cx
+    addw %cx, %di
+    cmpw %di, %bx
+    jb next_rect_pos_end
+    # out of range
+    incw %ax
+    movw %di, %bx
+    decw %bx
+    jmp next_rect_pos_end
+
+next_rect_pos_at_left:
+    decw %ax
+    cmpw %si, %ax
+    jae next_rect_pos_end
+    # out of range
+    movw %si, %ax
+    movw %di, %bx
+    incw %bx
+    jmp next_rect_pos_end
+
+next_rect_pos_at_bottom:
+    decw %bx
+    cmpw %di, %bx
+    jae next_rect_pos_end
+    # out of range
+    decw %ax
+    movw %di, %bx
+
+next_rect_pos_end:
     ret

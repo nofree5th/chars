@@ -1,4 +1,5 @@
 .include "macro-inl.s"
+.include "consts-inl.s"
 
 .global term_fd
 .global _start
@@ -7,19 +8,9 @@
 #=======================
     term_fd: .int 1
     term   : .asciz "/dev/tty"
-
-    .equiv area_width, 32
-    .equiv area_height, 16
-    .equiv border_row_char, '.'
-    .equiv border_col_char, ':'
-    .equiv border_start_row, 4
-    .equiv border_start_col, 25
-
-    .equiv echo_char_row, border_start_row
-    .equiv echo_char_col, border_start_col + area_width / 2
-
-    msg    : .asciz "hello world\n"
-    .equiv len, . - msg
+    echo_char: .byte '*'
+    echo_char_row: .word border_start_row
+    echo_char_col: .word border_start_col + area_width / 2
 
 .bss
 #=======================
@@ -54,9 +45,6 @@ _start:
     ioctl term_fd, $TCSETS, $cur_termios
 
     call hide_cursor
-    call clear_screen
-
-    call render_border
 
     # run
     call game_loop
@@ -84,13 +72,22 @@ render_border:
 # func game_loop
 .type game_loop, @function
 game_loop:
-game_loop_idle:
-    movb $'?', %al
+    call clear_screen
 game_loop_again:
-    # echo to screen
-    movb %al, %cl
-    movl $echo_char_row, %ax
-    movl $echo_char_col, %bx
+    call render_border
+
+    # move echo char
+    movl $border_start_row, %si
+    movl $border_start_col, %di
+    movb $area_width, %cl
+    movb $area_height, %ch
+    movw echo_char_row, %ax
+    movw echo_char_col, %bx
+    call next_rect_pos
+    movw %ax, echo_char_row
+    movw %bx, echo_char_col
+
+    movb echo_char, %cl
     call putchar
 
     mov $100, %eax
@@ -102,9 +99,9 @@ game_loop_again:
     je quit
 
     cmpb $0, %al
-    je game_loop_idle
+    je game_loop_again
 
-
+    movb %al, echo_char
     jmp game_loop_again
 quit:
     ret
