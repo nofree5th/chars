@@ -2,7 +2,8 @@
 
 .extern term_fd
 
-.global getch
+.global getchar
+.global putchar
 .global clear_screen
 
 .global hide_cursor
@@ -28,58 +29,67 @@
 .text
 #=======================
 #-----------------------
-# func getch()
+# func getchar()
 #  -> %al(0: get nothing, others: get a char)
-.type getch, @function
+.type getchar, @function
 .bss
-    .lcomm getch_buf, 1
+    .lcomm getchar_buf, 1
 .text
-getch:
-    read term_fd, $getch_buf, $1
+getchar:
+    read term_fd, $getchar_buf, $1
     cmpl $0, %eax
-    jle 1f
+    jle getchar_fail
     # succ
-    mov getch_buf, %al
-    jmp 2f
-1: # fail
+    mov getchar_buf, %al
+    jmp getchar_end
+getchar_fail:
     mov $0, %al
-2: # end
+getchar_end:
+    ret
+
+#-----------------------
+# func putchar
+# row/y(%ax), col/x(%bx)
+# char to put(%cl)
+.type putchar, @function
+.bss
+    .lcomm putchar_buf, 1
+.text
+putchar:
+    pushw %cx
+    call set_cursor_pos
+    popw %cx
+
+    movb %cl, putchar_buf
+    write term_fd, $putchar_buf, $1
     ret
 
 #-----------------------
 # func clear_screen
 .type clear_screen, @function
 clear_screen:
-    pushl %ebx
     write term_fd, $code_clear_screen, $code_clear_screen_len
-    popl %ebx
     ret
 
 #-----------------------
 # func hide_cursor
 .type hide_cursor, @function
 hide_cursor:
-    pushl %ebx
     write term_fd, $code_hide_cursor, $code_hide_cursor_len
-    popl %ebx
     ret
 
 #-----------------------
 # func show_cursor
 .type show_cursor, @function
 show_cursor:
-    pushl %ebx
     write term_fd, $code_show_cursor, $code_show_cursor_len
-    popl %ebx
     ret
 
 #-----------------------
 # func red
 .type red, @function
 red:
-    pushl %ebx
     write term_fd, $code_color_red, $code_color_len
-    popl %ebx
     ret
 
 #-----------------------
@@ -90,15 +100,16 @@ red:
     .lcomm set_cursor_pos_buf, 20
 .text
 set_cursor_pos:
-    pushl %edi
     # \033
     movb $0x1B, set_cursor_pos_buf
     # [
     movb $'[', set_cursor_pos_buf + 1 # [
     # y
-    movl $set_cursor_pos_buf + 2, %edi
+    movl $(set_cursor_pos_buf + 2), %edi
     pushw %bx
+    pushl %edi
     call itoa
+    popl %edi
     popw %bx
     addl %ecx, %edi
     # ;
@@ -106,12 +117,15 @@ set_cursor_pos:
     incl %edi
     # x
     movw %bx, %ax
+    pushl %edi
     call itoa
+    popl %edi
     addl %ecx, %edi
     # H
     movb $'H', (%edi)
     incl %edi
+
+    # edi as len
     subl $set_cursor_pos_buf, %edi
     write term_fd, $set_cursor_pos_buf, %edi
-    popl %edi
     ret

@@ -30,7 +30,7 @@ msleep:
 itoa:
     xorl %ecx, %ecx
     movb $10, %bl
-1:
+itoa_mod_again:
     div %bl
     movzbl %ah, %edx
     movb decimal_map(, %edx, 1),%bh
@@ -38,5 +38,20 @@ itoa:
     incl %ecx
     xorb %ah, %ah
     cmpb $0, %al
-    jnz 1b
+    jnz itoa_mod_again
+
+    # reverse [edi, esi]
+    movl %edi, %esi
+    addl %ecx, %esi
+    decl %esi
+itoa_reverse_again:
+    cmpl %edi, %esi
+    jbe itoa_exit
+    movb (%esi), %al
+    xchgb %al, (%edi)
+    movb %al, (%esi)
+    decl %esi
+    incl %edi
+    jmp itoa_reverse_again
+itoa_exit:
     ret

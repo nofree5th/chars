@@ -1,12 +1,23 @@
 .include "macro-inl.s"
 
-.globl term_fd
-.globl _start
+.global term_fd
+.global _start
 
 .data
 #=======================
     term_fd: .int 1
     term   : .asciz "/dev/tty"
+
+    .equiv area_width, 32
+    .equiv area_height, 16
+    .equiv border_row_char, '.'
+    .equiv border_col_char, ':'
+    .equiv border_start_row, 4
+    .equiv border_start_col, 25
+
+    .equiv echo_char_row, border_start_row
+    .equiv echo_char_col, border_start_col + area_width / 2
+
     msg    : .asciz "hello world\n"
     .equiv len, . - msg
 
@@ -42,13 +53,10 @@ _start:
     movb $0, cur_termios + termios_cc_VMIN
     ioctl term_fd, $TCSETS, $cur_termios
 
-
-
     call hide_cursor
     call clear_screen
-    movw $1, %ax
-    movw $1, %bx
-    call set_cursor_pos
+
+    call render_border
 
     # run
     call game_loop
@@ -59,23 +67,45 @@ _start:
     exit $0
 
 #-----------------------
+# func render_border
+.type render_border, @function
+render_border:
+    call red
+    movw $border_start_row, %ax
+    movw $border_start_col, %bx
+    movb $area_width, %cl
+    movb $area_height, %ch
+    movb $border_row_char, %dl
+    movb $border_col_char, %dh
+    call draw_rect
+    ret
+
+#-----------------------
 # func game_loop
 .type game_loop, @function
 game_loop:
+game_loop_idle:
+    movb $'?', %al
+game_loop_again:
+    # echo to screen
+    movb %al, %cl
+    movl $echo_char_row, %ax
+    movl $echo_char_col, %bx
+    call putchar
+
     mov $100, %eax
     call msleep
 
-    call getch
+    call getchar
+
     cmpb $'q', %al
     je quit
+
     cmpb $0, %al
-    je game_loop
-
-    call red
-    write term_fd, $msg, $len
+    je game_loop_idle
 
 
-    jmp game_loop
+    jmp game_loop_again
 quit:
     ret
 
