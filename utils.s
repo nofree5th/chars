@@ -146,10 +146,11 @@ rand:
     # ax * rand_seed = dx:ax
     mulw rand_seed
     add $25111, %ax
-    adc $0, %dx
-    movw $31111, %cx
-    # dx:ax / cx = ax ... dx
-    divw %cx
-    mov %dx, rand_seed
-    mov %dx, %ax
+# adc $0, %dx
+#    movw $31111, %cx
+#    # dx:ax / cx = ax ... dx
+#    divw %cx
+#    mov %dx, rand_seed
+#    mov %dx, %ax
+    mov %ax, rand_seed
     ret

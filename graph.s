@@ -4,6 +4,7 @@
 .global draw_col_line
 .global draw_row_line
 .global draw_rect
+.global draw_elem
 
 .text
 #=======================
@@ -119,3 +120,45 @@ draw_rect:
     popw %ax
 
     ret
+
+#-----------------------
+# func draw_elem
+# elem row : ax
+# elem col : bx
+# elem char: cl
+# elem style pointer: edx
+#
+#   struct elem_offset { short row, col };
+#   struct elem {
+#     short count,
+#     elem_offset list[count]
+#   }
+.type draw_elem, @function
+draw_elem:
+    # %di as count
+    movw (%edx), %di
+    # %esi as pos pointer
+    mov %edx, %esi
+    # skip count
+    addl $2, %esi
+draw_elem_again:
+    push %ax
+    push %bx
+    push %cx
+    push %esi
+    push %di
+    addw (%esi), %ax
+    addw 2(%esi), %bx
+    call putchar
+    pop %di
+    pop %esi
+    pop %cx
+    pop %bx
+    pop %ax
+
+    # skip row/col offset
+    addl $4, %esi
+    dec %di
+    jnle draw_elem_again
+    ret
+

@@ -8,7 +8,6 @@
 #=======================
     term_fd: .int 1
     term   : .asciz "/dev/tty"
-    echo_char: .byte '?'
 
     .p2align 1,,
     echo_char_row: .word BORDER_START_ROW
@@ -16,31 +15,58 @@
 
     now_elem_row: .word ELEM_START_ROW
     now_elem_col: .word ELEM_START_COL
-    selected_elem_style: .long elem_style1
+    now_elem_style: .long elem_style1
+
+    now_speed: .word FPS
+    now_speed_counter: .word 0
 
     elem_style1:
         .word 1
         .word 0, 0
     elem_style2:
         .word 2
-        .word 0, 0   # O
-        .word -1, 0  # O
-    elem_style2_1:
-        .word 2
         .word 0, 0   #
-        .word 0, 1   # OO
+        .word 0, 1   # Oo
     elem_style3_1:
         .word 3
-        .word -1, 0  # O
-        .word 0, 0   # O
-        .word 1, 0   # O
+        .word 0, -1  #
+        .word 0, 0   #
+        .word 0, 1   # oOo
     elem_style3_2:
         .word 3
         .word 0, 0   #
-        .word 0, 1   # OO
-        .word 1, 0   # O
-    .equiv ELEM_STYLE_COUNT, 5
-    elem_style_list: .long elem_style1, elem_style2, elem_style2_1, elem_style3_1, elem_style3_2
+        .word -1, 1  # o
+        .word 0, 1   # Oo
+    elem_style4_1:
+        .word 4
+        .word 0, 0   #
+        .word 0, -1  #
+        .word 0, 1   #
+        .word 0, 2   # oOoo
+    elem_style4_2:
+        .word 4
+        .word 0, 0   #
+        .word 0, -1  #
+        .word 0, 1   #  o
+        .word -1, 0  # oOo
+    elem_style4_3:
+        .word 4
+        .word 0, 0   #
+        .word 0, -1  #
+        .word -1, -1 # oo
+        .word -1, 0  # oO
+    elem_style4_4:
+        .word 4
+        .word 0, 0   #
+        .word 0, 1   #
+        .word 0, 2   # o
+        .word -1, 0  # Ooo
+    elem_style_list: .long elem_style1
+                     .long elem_style2
+                     .long elem_style3_1, elem_style3_2
+                     .long elem_style4_1, elem_style4_2, elem_style4_3, elem_style4_4
+    # NOTE: ELEM_STYLE_COUNT should not be confict with rand
+    .equiv ELEM_STYLE_COUNT, (. - elem_style_list) / 4
 
 .bss
 #=======================
@@ -125,47 +151,13 @@ render_border:
     movw %ax, echo_char_row
     movw %bx, echo_char_col
 
-    movb echo_char, %cl
+    movb last_char, %cl
     call putchar
-    ret
-#-----------------------
-# func render_elem
-# elem row : ax
-# elem col : bx
-# elem char: cl
-# elem style pointer: edx
-.type render_elem, @function
-render_elem:
-    # %di as count
-    movw (%edx), %di
-    # %esi as pos pointer
-    mov %edx, %esi
-    # skip count
-    addl $2, %esi
-render_elem_again:
-    push %ax
-    push %bx
-    push %cx
-    push %esi
-    push %di
-    addw (%esi), %ax
-    addw 2(%esi), %bx
-    call putchar
-    pop %di
-    pop %esi
-    pop %cx
-    pop %bx
-    pop %ax
-
-    # skip row/col offset
-    addl $4, %esi
-    dec %di
-    jnle render_elem_again
     ret
 
 #-----------------------
 # func next_elem_style
-# next_elem_style_pointer: edx
+# next_elem_style_pointer: edx & now_elem_style
 .type next_elem_style, @function
 next_elem_style:
     call rand
@@ -175,47 +167,71 @@ next_elem_style:
     div %bx
     movzwl %dx, %ebx
     movl elem_style_list(, %ebx, 4), %edx
+    movl %edx, now_elem_style
+    ret
+#-----------------------
+# func clear_now_elem
+.type clear_now_elem, @function
+clear_now_elem:
+    movl now_elem_style, %edx
+    movw now_elem_row, %ax
+    movw now_elem_col, %bx
+    movb $CLEAR_CHAR, %cl
+    call draw_elem
+    ret
+
+#-----------------------
+# func render_now_elem
+.type render_now_elem, @function
+render_now_elem:
+    movl now_elem_style, %edx
+    movw now_elem_row, %ax
+    movw now_elem_col, %bx
+    movb last_char, %cl
+    call draw_elem
     ret
 
 #-----------------------
 # func game_loop
 .type game_loop, @function
 game_loop:
+    call next_elem_style
     call clear_screen
 game_loop_again:
 
-    # clear last
-    movl selected_elem_style, %edx
-    movw now_elem_row, %ax
-    movw now_elem_col, %bx
-    movb $CLEAR_CHAR, %cl
-    call render_elem
-
-    call next_elem_style
-    movl %edx, selected_elem_style
-
-    movl selected_elem_style, %edx
-    movw now_elem_row, %ax
-    movw now_elem_col, %bx
-    movb echo_char, %cl
-    call render_elem
-
     call render_border
+    call render_now_elem
 
     mov $(1000 / FPS), %eax
     call msleep
+    incw now_speed_counter
 
     # check input
     call getchar
-
+#cmpb $0, %al
+#je game_loop_again
     cmpb $'q', %al
     je quit
 
-    cmpb $0, %al
-    je game_loop_again
+    # check game timer
+    movw now_speed, %cx
+    cmpw %cx, now_speed_counter
+    jnge game_loop_again
 
-    movb %al, echo_char
+    # process_game_frame
+    movw $0, now_speed_counter
+
+    call clear_now_elem
+    incw now_elem_row
+    movw $(BORDER_START_ROW + AREA_HEIGHT - 1), %ax
+    cmpw %ax, now_elem_row
+    jnge game_loop_again
+
+    # generate next
+    movw $ELEM_START_ROW, now_elem_row
+    call next_elem_style
     jmp game_loop_again
+
 quit:
     ret
 

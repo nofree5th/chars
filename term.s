@@ -2,6 +2,8 @@
 
 .extern term_fd
 
+.global last_char # variable
+
 .global getchar
 .global putchar
 .global clear_screen
@@ -28,21 +30,20 @@
     code_color_red: .ascii "\033[31m"
     code_color_green: .ascii "\033[32m"
 
+    last_char: .byte '?'
+
 .text
 #=======================
 #-----------------------
 # func getchar()
 #  -> %al(0: get nothing, others: get a char)
 .type getchar, @function
-.bss
-    .lcomm getchar_buf, 1
-.text
 getchar:
-    read term_fd, $getchar_buf, $1
+    read term_fd, $last_char, $1
     cmpl $0, %eax
     jle getchar_fail
     # succ
-    mov getchar_buf, %al
+    mov last_char, %al
     jmp getchar_end
 getchar_fail:
     mov $0, %al
