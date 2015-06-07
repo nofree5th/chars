@@ -8,6 +8,10 @@
 
 .equiv CLEAR_CHAR, ' '
 
+.equiv CHAR_DOWN, 's'
+.equiv CHAR_LEFT, 'a'
+.equiv CHAR_RIGHT, 'd'
+
 # border
 .equiv AREA_WIDTH, CONTENT_WIDTH + 2
 .equiv AREA_HEIGHT, CONTENT_HEIGHT + 2

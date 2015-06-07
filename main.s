@@ -192,6 +192,40 @@ render_now_elem:
     ret
 
 #-----------------------
+# func process_cmd
+# cmd_char(%al)
+.type process_cmd, @function
+process_cmd:
+    push %ax
+    call clear_now_elem
+    pop %ax
+
+    cmpb $CHAR_LEFT, %al
+    je turn_left
+    cmpb $CHAR_RIGHT, %al
+    je turn_right
+    cmpb $CHAR_DOWN, %al
+    je go_down
+    # TODO MORE
+    ret
+go_down:
+    incw now_elem_row
+    movw $(BORDER_START_ROW + AREA_HEIGHT - 1), %bx
+    cmpw %bx, now_elem_row
+    jge generate_next
+    ret
+generate_next:
+    movw $ELEM_START_ROW, now_elem_row
+    call next_elem_style
+    ret
+turn_left:
+    decw now_elem_col
+    ret
+turn_right:
+    incw now_elem_col
+    ret
+
+#-----------------------
 # func game_loop
 .type game_loop, @function
 game_loop:
@@ -208,28 +242,21 @@ game_loop_again:
 
     # check input
     call getchar
-#cmpb $0, %al
-#je game_loop_again
+
+    cmpb $0, %al
+    je 1f
+    call process_cmd
+1:
     cmpb $'q', %al
     je quit
 
-    # check game timer
+    # check game frame
     movw now_speed, %cx
     cmpw %cx, now_speed_counter
     jnge game_loop_again
-
-    # process_game_frame
     movw $0, now_speed_counter
-
-    call clear_now_elem
-    incw now_elem_row
-    movw $(BORDER_START_ROW + AREA_HEIGHT - 1), %ax
-    cmpw %ax, now_elem_row
-    jnge game_loop_again
-
-    # generate next
-    movw $ELEM_START_ROW, now_elem_row
-    call next_elem_style
+    movb $CHAR_DOWN, %al
+    call process_cmd
     jmp game_loop_again
 
 quit:
