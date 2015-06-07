@@ -77,11 +77,15 @@
     .lcomm old_termios, 60
     .lcomm cur_termios, 60
 
+    .lcomm now_elem,  ELEM_MAX_SIZE
+    .lcomm buf_elem, ELEM_MAX_SIZE
+
 .text
 #=======================
 #-----------------------
 # entrance
 _start:
+  # init
     # open tty
     open $term, $O_RDWR
     movl %eax, term_fd
@@ -90,7 +94,7 @@ _start:
     #   get original
     ioctl term_fd, $TCGETS, $old_termios
 
-    #   make copy
+    # make copy
     movl $old_termios, %esi
     movl $cur_termios, %edi
     movl $60 / 4, %ecx
@@ -107,10 +111,10 @@ _start:
     time
     call srand
 
-    # run
+  # run
     call game_loop
 
-    # recover env
+  # fini (recover env)
     call clear_screen
     call show_cursor
     ioctl term_fd, $TCSETS, $old_termios
@@ -157,7 +161,7 @@ render_border:
 
 #-----------------------
 # func next_elem_style
-# next_elem_style_pointer: edx & now_elem_style
+# -> now_elem
 .type next_elem_style, @function
 next_elem_style:
     call rand
@@ -166,16 +170,21 @@ next_elem_style:
     # dx:ax / bx = ax ... dx
     div %bx
     movzwl %dx, %ebx
-    movl elem_style_list(, %ebx, 4), %edx
-    movl %edx, now_elem_style
+    movl elem_style_list(, %ebx, 4), %esi
+    movw $ELEM_START_ROW, now_elem + ELEM_OFFSET_ROW
+    movw $ELEM_START_COL, now_elem + ELEM_OFFSET_COL
+    lea now_elem + ELEM_OFFSET_COUNT, %edi
+    movl (%esi), %ecx
+    sall %ecx
+    inc %ecx
+    rep movsw
     ret
+
 #-----------------------
 # func clear_now_elem
 .type clear_now_elem, @function
 clear_now_elem:
-    movl now_elem_style, %edx
-    movw now_elem_row, %ax
-    movw now_elem_col, %bx
+    lea now_elem, %esi
     movb $CLEAR_CHAR, %cl
     call draw_elem
     ret
@@ -184,9 +193,7 @@ clear_now_elem:
 # func render_now_elem
 .type render_now_elem, @function
 render_now_elem:
-    movl now_elem_style, %edx
-    movw now_elem_row, %ax
-    movw now_elem_col, %bx
+    lea now_elem, %esi
     movb last_char, %cl
     call draw_elem
     ret
@@ -200,6 +207,14 @@ process_cmd:
     call clear_now_elem
     pop %ax
 
+    # make copy
+    lea now_elem, %esi
+    lea buf_elem, %edi
+    movl $ELEM_MAX_SIZE, %ecx
+    rep movsb
+
+    lea now_elem, %edi
+
     cmpb $CHAR_LEFT, %al
     je turn_left
     cmpb $CHAR_RIGHT, %al
@@ -209,20 +224,19 @@ process_cmd:
     # TODO MORE
     ret
 go_down:
-    incw now_elem_row
+    incw ELEM_OFFSET_ROW(%edi)
     movw $(BORDER_START_ROW + AREA_HEIGHT - 1), %bx
-    cmpw %bx, now_elem_row
+    cmpw %bx, ELEM_OFFSET_ROW(%edi)
     jge generate_next
     ret
 generate_next:
-    movw $ELEM_START_ROW, now_elem_row
     call next_elem_style
     ret
 turn_left:
-    decw now_elem_col
+    decw ELEM_OFFSET_COL(%edi)
     ret
 turn_right:
-    incw now_elem_col
+    incw ELEM_OFFSET_COL(%edi)
     ret
 
 #-----------------------
@@ -233,6 +247,7 @@ game_loop:
     call clear_screen
 game_loop_again:
 
+  # render
     call render_border
     call render_now_elem
 
@@ -240,9 +255,8 @@ game_loop_again:
     call msleep
     incw now_speed_counter
 
-    # check input
+  # process input
     call getchar
-
     cmpb $0, %al
     je 1f
     call process_cmd
@@ -250,7 +264,7 @@ game_loop_again:
     cmpb $'q', %al
     je quit
 
-    # check game frame
+  # process timer(game auto down)
     movw now_speed, %cx
     cmpw %cx, now_speed_counter
     jnge game_loop_again

@@ -3,8 +3,23 @@
 
 .equiv CONTENT_WIDTH, 12
 .equiv CONTENT_HEIGHT, 20
+
+#  elem = part of items
+#   struct elem {
+#     short row, col; // base item position
+#     short count; // item count
+#     struct item_offset {
+#        short row_offset, col_offset; // relative to base item
+#     } item_offset_list[count];
+#   }
 .equiv ELEM_START_ROW, BORDER_START_ROW + 4
 .equiv ELEM_START_COL, BORDER_START_COL + CONTENT_WIDTH / 2
+.equiv ELEM_MAX_SIZE, 2 + 2 + 2 + 4 * 10 # (row + col + count + max 10 elem_pos)
+# struct offset
+.equiv ELEM_OFFSET_ROW, 0
+.equiv ELEM_OFFSET_COL, ELEM_OFFSET_ROW + 2
+.equiv ELEM_OFFSET_COUNT, ELEM_OFFSET_COL + 2
+.equiv ELEM_OFFSET_ITEM, ELEM_OFFSET_COUNT + 2
 
 .equiv CLEAR_CHAR, ' '
 
