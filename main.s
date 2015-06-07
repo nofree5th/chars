@@ -77,8 +77,10 @@
     .lcomm old_termios, 60
     .lcomm cur_termios, 60
 
-    .lcomm now_elem,  ELEM_MAX_SIZE
+    .lcomm now_elem, ELEM_MAX_SIZE
     .lcomm buf_elem, ELEM_MAX_SIZE
+
+    .lcomm map_item, CONTENT_WIDTH * CONTENT_HEIGHT
 
 .text
 #=======================
@@ -199,6 +201,55 @@ render_now_elem:
     ret
 
 #-----------------------
+# func check_elem_pos_leage
+# elem pointer(%edi)
+# -> al(0: not leage, else leage)
+.type check_elem_pos_leage, @function
+check_elem_pos_leage:
+    movw ELEM_OFFSET_ROW(%edi), %ax
+    movw ELEM_OFFSET_COL(%edi), %bx
+    movw ELEM_OFFSET_COUNT(%edi), %cx
+    # skip to item
+    addl $ELEM_OFFSET_ITEM, %edi
+check_elem_pos_again:
+    addw (%edi), %ax
+    addw 2(%edi), %bx
+  # check is pos out of range
+    # row
+    cmpw $(BORDER_START_ROW + 1), %ax
+    jnge pos_not_leage
+    cmpw $(BORDER_START_ROW + AREA_HEIGHT - 1), %ax
+    jge pos_not_leage
+
+    # col
+    cmpw $(BORDER_START_COL + 1), %bx
+    jnge pos_not_leage
+    cmpw $(BORDER_START_COL + AREA_WIDTH - 1), %bx
+    jge pos_not_leage
+
+ ## check is pos mapped item
+ #  # calc map index = (row - start_row) * width + col
+ #  subw $ELEM_START_ROW, %ax
+ #  # * width
+ #  movw $CONTENT_WIDTH, %dx
+ #  mul %dx
+ #  add %bx, %ax
+ #  movzwl %ax, %edx
+ #  xor %edx, %edx
+ #  cmpb $0, map_item(%edx)
+ #  jne pos_not_leage
+
+    # skip row/col offset
+    addl $4, %edi
+    dec %cx
+    jnle check_elem_pos_again
+    mov $1, %al
+    ret
+pos_not_leage:
+    mov $0, %al
+    ret
+
+#-----------------------
 # func process_cmd
 # cmd_char(%al)
 .type process_cmd, @function
@@ -208,12 +259,13 @@ process_cmd:
     pop %ax
 
     # make copy
-    lea now_elem, %esi
-    lea buf_elem, %edi
+    leal now_elem, %esi
+    leal buf_elem, %edi
     movl $ELEM_MAX_SIZE, %ecx
+    cld
     rep movsb
 
-    lea now_elem, %edi
+    leal buf_elem, %edi
 
     cmpb $CHAR_LEFT, %al
     je turn_left
@@ -225,18 +277,29 @@ process_cmd:
     ret
 go_down:
     incw ELEM_OFFSET_ROW(%edi)
-    movw $(BORDER_START_ROW + AREA_HEIGHT - 1), %bx
-    cmpw %bx, ELEM_OFFSET_ROW(%edi)
-    jge generate_next
-    ret
-generate_next:
-    call next_elem_style
-    ret
+    jmp try_execute
 turn_left:
     decw ELEM_OFFSET_COL(%edi)
-    ret
+    jmp try_execute
 turn_right:
     incw ELEM_OFFSET_COL(%edi)
+    #jmp try_execute
+
+try_execute:
+    call check_elem_pos_leage
+    cmpb $0, %al
+    je generate_next
+
+    # copy to now
+    lea buf_elem, %esi
+    lea now_elem, %edi
+    movl $ELEM_MAX_SIZE, %ecx
+    cld
+    rep movsb
+    ret
+
+generate_next:
+    call next_elem_style
     ret
 
 #-----------------------
