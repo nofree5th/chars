@@ -3,6 +3,8 @@
 .global msleep
 .global itoa
 .global next_rect_pos
+.global srand
+.global rand
 
 .text
 #=======================
@@ -122,4 +124,32 @@ next_rect_pos_at_bottom:
     movw %di, %bx
 
 next_rect_pos_end:
+    ret
+#-----------------------
+# func srand
+# ax(seed)
+.bss
+    rand_seed: .word 0
+.text
+.type srand, @function
+srand:
+    movw %ax, rand_seed
+    ret
+
+#-----------------------
+# func rand
+# -> ax(randomized number)
+# seed = (seed * 217 + 25111) % 31111
+.type rand, @function
+rand:
+    movw $217, %ax
+    # ax * rand_seed = dx:ax
+    mulw rand_seed
+    add $25111, %ax
+    adc $0, %dx
+    movw $31111, %cx
+    # dx:ax / cx = ax ... dx
+    divw %cx
+    mov %dx, rand_seed
+    mov %dx, %ax
     ret

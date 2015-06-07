@@ -1,6 +1,17 @@
 
-.equiv AREA_WIDTH, 32
-.equiv AREA_HEIGHT, 16
+#.equiv FPS, 24
+.equiv FPS, 2
+
+.equiv CONTENT_WIDTH, 12
+.equiv CONTENT_HEIGHT, 20
+.equiv ELEM_START_ROW, BORDER_START_ROW + 1
+.equiv ELEM_START_COL, BORDER_START_COL + CONTENT_WIDTH / 2
+
+.equiv CLEAR_CHAR, ' '
+
+# border
+.equiv AREA_WIDTH, CONTENT_WIDTH + 2
+.equiv AREA_HEIGHT, CONTENT_HEIGHT + 2
 .equiv BORDER_ROW_CHAR, '.'
 .equiv BORDER_COL_CHAR, ':'
 .equiv BORDER_CORNER_CHAR, '.'

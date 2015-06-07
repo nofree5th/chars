@@ -9,14 +9,45 @@
     term_fd: .int 1
     term   : .asciz "/dev/tty"
     echo_char: .byte '?'
+
+    .p2align 1,,
     echo_char_row: .word BORDER_START_ROW
     echo_char_col: .word BORDER_START_COL + AREA_WIDTH / 2
+
+    now_elem_row: .word ELEM_START_ROW
+    now_elem_col: .word ELEM_START_COL
+    selected_elem_style: .long elem_style1
+
+    elem_style1:
+        .word 1
+        .word 0, 0
+    elem_style2:
+        .word 2
+        .word 0, 0   # O
+        .word -1, 0  # O
+    elem_style2_1:
+        .word 2
+        .word 0, 0   #
+        .word 0, 1   # OO
+    elem_style3_1:
+        .word 3
+        .word -1, 0  # O
+        .word 0, 0   # O
+        .word 1, 0   # O
+    elem_style3_2:
+        .word 3
+        .word 0, 0   #
+        .word 0, 1   # OO
+        .word 1, 0   # O
+    .equiv ELEM_STYLE_COUNT, 5
+    elem_style_list: .long elem_style1, elem_style2, elem_style2_1, elem_style3_1, elem_style3_2
 
 .bss
 #=======================
     .equiv termios_lflag, 12
     .equiv termios_cc_VMIN, 17 + 6
     .equiv termios_cc_VTIME, 17 + 5
+    .p2align 2,,
     .lcomm old_termios, 60
     .lcomm cur_termios, 60
 
@@ -45,6 +76,10 @@ _start:
     ioctl term_fd, $TCSETS, $cur_termios
 
     call hide_cursor
+
+    # init rand
+    time
+    call srand
 
     # run
     call game_loop
@@ -77,18 +112,9 @@ render_border:
     movw $(BORDER_START_COL + AREA_WIDTH - 1), %bx
     movb $BORDER_CORNER_CHAR, %cl
     call putchar
-    ret
 
-#-----------------------
-# func game_loop
-.type game_loop, @function
-game_loop:
-    call clear_screen
-game_loop_again:
-    call render_border
-
+    # render echo char
     call set_color_green
-    # move echo char
     movw $BORDER_START_ROW, %si
     movw $BORDER_START_COL, %di
     movb $AREA_WIDTH, %cl
@@ -101,10 +127,85 @@ game_loop_again:
 
     movb echo_char, %cl
     call putchar
+    ret
+#-----------------------
+# func render_elem
+# elem row : ax
+# elem col : bx
+# elem char: cl
+# elem style pointer: edx
+.type render_elem, @function
+render_elem:
+    # %di as count
+    movw (%edx), %di
+    # %esi as pos pointer
+    mov %edx, %esi
+    # skip count
+    addl $2, %esi
+render_elem_again:
+    push %ax
+    push %bx
+    push %cx
+    push %esi
+    push %di
+    addw (%esi), %ax
+    addw 2(%esi), %bx
+    call putchar
+    pop %di
+    pop %esi
+    pop %cx
+    pop %bx
+    pop %ax
 
-    mov $50, %eax
+    # skip row/col offset
+    addl $4, %esi
+    dec %di
+    jnle render_elem_again
+    ret
+
+#-----------------------
+# func next_elem_style
+# next_elem_style_pointer: edx
+.type next_elem_style, @function
+next_elem_style:
+    call rand
+    xor %dx, %dx
+    mov $ELEM_STYLE_COUNT, %bx
+    # dx:ax / bx = ax ... dx
+    div %bx
+    movzwl %dx, %ebx
+    movl elem_style_list(, %ebx, 4), %edx
+    ret
+
+#-----------------------
+# func game_loop
+.type game_loop, @function
+game_loop:
+    call clear_screen
+game_loop_again:
+
+    # clear last
+    movl selected_elem_style, %edx
+    movw now_elem_row, %ax
+    movw now_elem_col, %bx
+    movb $CLEAR_CHAR, %cl
+    call render_elem
+
+    call next_elem_style
+    movl %edx, selected_elem_style
+
+    movl selected_elem_style, %edx
+    movw now_elem_row, %ax
+    movw now_elem_col, %bx
+    movb echo_char, %cl
+    call render_elem
+
+    call render_border
+
+    mov $(1000 / FPS), %eax
     call msleep
 
+    # check input
     call getchar
 
     cmpb $'q', %al

@@ -8,6 +8,7 @@
 .equiv __NR_close,      6
 .equiv __NR_nanosleep,  162
 .equiv __NR_ioctl,      54
+.equiv __NR_time,       13
 
 .equiv O_RDWR, 2
 .equiv TCGETS, 0x5401
@@ -76,5 +77,12 @@
 
 .macro ioctl fd, type, request
     __call3 $__NR_ioctl, \fd, \type, \request
+.endm
+
+.macro time
+    __call1 $__NR_time, $0
+.endm
+
+.macro ADD_POS offset_row, offset_col
 .endm
 
