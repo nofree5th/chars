@@ -1,4 +1,4 @@
-.include "macro-inl.s"
+.include "sys_call-inl.s"
 
 .global msleep
 .global itoa

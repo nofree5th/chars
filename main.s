@@ -254,11 +254,11 @@ check_elem_pos_again:
     mov $POS_OK, %al
     ret
 out_of_range:
-    addw $4, %esp # discard %bx/ax
+    add $4, %esp # discard %bx/ax
     mov $POS_OUT_OF_RANGE, %al
     ret
 pos_not_leage:
-    addw $4, %esp # discard %bx/ax
+    add $4, %esp # discard %bx/ax
     mov $POS_DEAD, %al
     ret
 
