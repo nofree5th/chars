@@ -1,4 +1,4 @@
-.include "macro-inl.s"
+.include "sys_call-inl.s"
 .include "consts-inl.s"
 
 .global term_fd
@@ -201,31 +201,37 @@ render_now_elem:
     ret
 
 #-----------------------
-# func check_elem_pos_leage
+# func check_elem_pos
 # elem pointer(%edi)
-# -> al(0: not leage, else leage)
-.type check_elem_pos_leage, @function
-check_elem_pos_leage:
+# -> al(0: leage, 1: out of range, 2: dead)
+.equiv POS_OK, 0
+.equiv POS_OUT_OF_RANGE, 1
+.equiv POS_DEAD, 2
+.type check_elem_pos, @function
+check_elem_pos:
     movw ELEM_OFFSET_ROW(%edi), %ax
     movw ELEM_OFFSET_COL(%edi), %bx
     movw ELEM_OFFSET_COUNT(%edi), %cx
+    movzwl %cx, %ecx
     # skip to item
     addl $ELEM_OFFSET_ITEM, %edi
 check_elem_pos_again:
+    push %ax
+    push %bx
     addw (%edi), %ax
     addw 2(%edi), %bx
   # check is pos out of range
     # row
-    cmpw $(BORDER_START_ROW + 1), %ax
-    jnge pos_not_leage
+    cmpw $BORDER_START_ROW, %ax
+    jng out_of_range
     cmpw $(BORDER_START_ROW + AREA_HEIGHT - 1), %ax
     jge pos_not_leage
 
     # col
-    cmpw $(BORDER_START_COL + 1), %bx
-    jnge pos_not_leage
+    cmpw $BORDER_START_COL, %bx
+    jng out_of_range
     cmpw $(BORDER_START_COL + AREA_WIDTH - 1), %bx
-    jge pos_not_leage
+    jge out_of_range
 
  ## check is pos mapped item
  #  # calc map index = (row - start_row) * width + col
@@ -239,14 +245,21 @@ check_elem_pos_again:
  #  cmpb $0, map_item(%edx)
  #  jne pos_not_leage
 
+    pop %bx
+    pop %ax
+
     # skip row/col offset
     addl $4, %edi
-    dec %cx
-    jnle check_elem_pos_again
-    mov $1, %al
+    loop check_elem_pos_again
+    mov $POS_OK, %al
+    ret
+out_of_range:
+    addw $4, %esp # discard %bx/ax
+    mov $POS_OUT_OF_RANGE, %al
     ret
 pos_not_leage:
-    mov $0, %al
+    addw $4, %esp # discard %bx/ax
+    mov $POS_DEAD, %al
     ret
 
 #-----------------------
@@ -286,10 +299,14 @@ turn_right:
     #jmp try_execute
 
 try_execute:
-    call check_elem_pos_leage
-    cmpb $0, %al
+    call check_elem_pos
+    cmpb $POS_OK, %al
+    je do_execute
+    cmpb $POS_DEAD, %al
     je generate_next
-
+    # else POS_OUT_OF_RANGE
+    ret
+do_execute:
     # copy to now
     lea buf_elem, %esi
     lea now_elem, %edi
@@ -297,7 +314,6 @@ try_execute:
     cld
     rep movsb
     ret
-
 generate_next:
     call next_elem_style
     ret
