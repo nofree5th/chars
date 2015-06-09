@@ -7,3 +7,13 @@ Calling convention(fastcall liked): All registers can be used freely, and parame
 The environment relies on the Linux 32 bit protected mode, do not rely on libc.
 
 How to play? Just make it.
+
+Routine:
+
+    Init
+    GameLoop
+        Render
+        OnGameFrame
+            ProcessUserInput
+        OnLevelTimer
+    Fini

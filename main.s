@@ -160,6 +160,37 @@ render_border:
     movb last_char, %cl
     call putchar
     ret
+#-----------------------
+# func map_now_elem
+.type map_now_elem, @function
+map_now_elem:
+    lea now_elem, %esi
+    movw ELEM_OFFSET_ROW(%esi), %ax
+    movw ELEM_OFFSET_COL(%esi), %bx
+    movw ELEM_OFFSET_COUNT(%esi), %di
+    movw ELEM_OFFSET_COUNT(%esi), %cx
+    movzwl %cx, %ecx
+    # skip to item
+    addl $ELEM_OFFSET_ITEM, %esi
+map_item_again:
+    push %ax
+    push %bx
+    addw (%esi), %ax
+    addw 2(%esi), %bx
+
+    push %ecx
+    push %esi
+    call row_col_to_index
+    pop %esi
+    pop %ecx
+    movb $'$', map_item(%eax)
+
+    pop %bx
+    pop %ax
+    # skip row/col offset
+    addl $4, %esi
+    loop map_item_again
+    ret
 
 #-----------------------
 # func next_elem_style
@@ -201,6 +232,58 @@ render_now_elem:
     ret
 
 #-----------------------
+# func render_item_map
+.type render_item_map, @function
+render_item_map:
+    lea now_elem, %esi
+
+    mov $BORDER_START_ROW, %ax
+    mov $AREA_HEIGHT - 2, %ecx
+    mov $-1, %esi
+render_row_again:
+    push %ecx
+    inc %ax
+
+    mov $BORDER_START_COL, %bx
+    mov $AREA_WIDTH - 2, %ecx
+render_col_again:
+    inc %bx
+    inc %esi
+    cmpb $0, map_item(%esi)
+    je empty_item
+    push %ax
+    push %bx
+    push %esi
+    push %ecx
+    movb map_item(%esi), %cl
+    call putchar
+    pop %ecx
+    pop %esi
+    pop %bx
+    pop %ax
+empty_item:
+    loop render_col_again
+    pop %ecx
+    loop render_row_again
+    ret
+
+#-----------------------
+# func row_col_to_index
+# row(ax), col(bx)
+# -> ax(index)
+.type row_col_to_index, @function
+row_col_to_index:
+    # calc map index = (row - start_row) * width + (col - start_col)
+    sub $BORDER_START_ROW + 1, %ax
+    sub $BORDER_START_COL + 1, %bx
+    # * width
+    mov $CONTENT_WIDTH, %dx
+    mul %dx
+    add %bx, %ax
+    movzwl %ax, %eax
+    ret
+
+#-----------------------
 # func check_elem_pos
 # elem pointer(%edi)
 # -> al(0: leage, 1: out of range, 2: dead)
@@ -233,17 +316,14 @@ check_elem_pos_again:
     cmpw $(BORDER_START_COL + AREA_WIDTH - 1), %bx
     jge out_of_range
 
- ## check is pos mapped item
- #  # calc map index = (row - start_row) * width + col
- #  subw $ELEM_START_ROW, %ax
- #  # * width
- #  movw $CONTENT_WIDTH, %dx
- #  mul %dx
- #  add %bx, %ax
- #  movzwl %ax, %edx
- #  xor %edx, %edx
- #  cmpb $0, map_item(%edx)
- #  jne pos_not_leage
+  # check is pos mapped item
+    push %ecx
+    push %edi
+    call row_col_to_index
+    pop %edi
+    pop %ecx
+    cmpb $0, map_item(%eax)
+    jne pos_not_leage
 
     pop %bx
     pop %ax
@@ -315,6 +395,7 @@ do_execute:
     rep movsb
     ret
 generate_next:
+    call map_now_elem
     call next_elem_style
     ret
 
@@ -329,6 +410,7 @@ game_loop_again:
   # render
     call render_border
     call render_now_elem
+    call render_item_map
 
     mov $(1000 / FPS), %eax
     call msleep
