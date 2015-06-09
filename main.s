@@ -230,6 +230,10 @@ merge_row_again:
     sub $map_item - 1, %ecx
     std
     rep movsb
+
+    movb $1, %dl
+    call render_item_map
+
     # check current row again(ecx no need add)
     # esi set from edi
     pop %esi
@@ -282,6 +286,7 @@ next_elem_style:
     div %bx
     movzwl %dx, %ebx
     movl elem_style_list(, %ebx, 4), %esi
+    movl $elem_style4_1, %esi
     movw $ELEM_START_ROW, now_elem + ELEM_OFFSET_ROW
     movw $ELEM_START_COL, now_elem + ELEM_OFFSET_COL
     lea now_elem + ELEM_OFFSET_COUNT, %edi
@@ -312,6 +317,7 @@ render_now_elem:
 
 #-----------------------
 # func render_item_map
+# need_clear(dl != 0)
 .type render_item_map, @function
 render_item_map:
     mov $BORDER_START_ROW, %ax
@@ -326,19 +332,23 @@ render_row_again:
 render_col_again:
     inc %bx
     inc %esi
-    cmpb $0, map_item(%esi)
-    je empty_item
+    push %ecx
+    movb map_item(%esi), %cl
+    cmpb $0, %cl
+    jne show_item
+    cmpb $0, %dl
+    je no_need_clear_empty_item
+    movb $CLEAR_CHAR, %cl
+show_item:
     push %ax
     push %bx
     push %esi
-    push %ecx
-    movb map_item(%esi), %cl
     call putchar
-    pop %ecx
     pop %esi
     pop %bx
     pop %ax
-empty_item:
+no_need_clear_empty_item:
+    pop %ecx
     loop render_col_again
     pop %ecx
     loop render_row_again
@@ -489,6 +499,7 @@ game_loop_again:
     call render_stat
     call render_border
     call render_now_elem
+    xor %dl, %dl
     call render_item_map
 
     mov $(1000 / FPS), %eax
