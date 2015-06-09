@@ -9,6 +9,9 @@
     term_fd: .int 1
     term   : .asciz "/dev/tty"
 
+    # game data
+    score  : .word 0
+
     .p2align 1,,
     echo_char_row: .word BORDER_START_ROW
     echo_char_col: .word BORDER_START_COL + AREA_WIDTH / 2
@@ -80,7 +83,11 @@
     .lcomm now_elem, ELEM_MAX_SIZE
     .lcomm buf_elem, ELEM_MAX_SIZE
 
-    .lcomm map_item, CONTENT_WIDTH * CONTENT_HEIGHT
+    .lcomm _map_item, CONTENT_WIDTH + CONTENT_WIDTH * CONTENT_HEIGHT
+    .equiv map_item, _map_item + CONTENT_WIDTH
+
+    # score buffer(12)
+    .lcomm buffer, 20
 
 .text
 #=======================
@@ -100,6 +107,7 @@ _start:
     movl $old_termios, %esi
     movl $cur_termios, %edi
     movl $60 / 4, %ecx
+    cld
     rep movsl
 
     andl $TTY_MODE, cur_termios + termios_lflag
@@ -121,6 +129,21 @@ _start:
     call show_cursor
     ioctl term_fd, $TCSETS, $old_termios
     exit $0
+#-----------------------
+# func render_stat
+.type render_stat, @function
+render_stat:
+    # score
+    call set_color_red
+    mov $SCORE_ROW, %ax
+    mov $SCORE_COL, %bx
+    call set_cursor_pos
+    movw score, %ax
+    leal buffer, %edi
+    call itoa
+    mov %ecx, %esi
+    write term_fd, $buffer, %esi
+    ret
 
 #-----------------------
 # func render_border
@@ -160,6 +183,61 @@ render_border:
     movb last_char, %cl
     call putchar
     ret
+#-----------------------
+# func try_merge_row
+# current row index end(%esi)
+# -> merged result(%al): 0, fail; 1, succ
+.type try_merge_row, @function
+try_merge_row:
+    mov $CONTENT_WIDTH, %ecx
+merge_col_again:
+    cmpb $0, (%esi)
+    je try_merge_row_fail
+    dec %esi
+    loop merge_col_again
+    mov $1, %al
+    ret
+try_merge_row_fail:
+    xor %al, %al
+    ret
+
+#-----------------------
+# func try_merge
+.type try_merge, @function
+try_merge:
+    leal map_item + (CONTENT_WIDTH * CONTENT_HEIGHT) - 1, %esi
+    mov $CONTENT_WIDTH, %ecx
+merge_row_again:
+    push %ecx
+
+    push %esi
+    call try_merge_row
+    pop %esi
+    # pointer to prev row end
+    sub $CONTENT_WIDTH, %esi
+    cmp $0, %al
+    je merge_end
+
+    # merge_succ:
+    incw score
+    # copy down
+    mov %esi, %edi
+    # edi pointer to current row end
+    add $CONTENT_WIDTH, %edi
+    push %edi
+    # calc count
+    mov %edi, %ecx
+    sub $map_item - 1, %ecx
+    std
+    rep movsb
+    # check current row again(ecx no need add)
+    # esi set from edi
+    pop %esi
+merge_end:
+    pop %ecx
+    loop merge_row_again
+    ret
+
 #-----------------------
 # func map_now_elem
 .type map_now_elem, @function
@@ -210,6 +288,7 @@ next_elem_style:
     movl (%esi), %ecx
     sall %ecx
     inc %ecx
+    cld
     rep movsw
     ret
 
@@ -235,8 +314,6 @@ render_now_elem:
 # func render_item_map
 .type render_item_map, @function
 render_item_map:
-    lea now_elem, %esi
-
     mov $BORDER_START_ROW, %ax
     mov $AREA_HEIGHT - 2, %ecx
     mov $-1, %esi
@@ -396,6 +473,7 @@ do_execute:
     ret
 generate_next:
     call map_now_elem
+    call try_merge
     call next_elem_style
     ret
 
@@ -408,6 +486,7 @@ game_loop:
 game_loop_again:
 
   # render
+    call render_stat
     call render_border
     call render_now_elem
     call render_item_map
