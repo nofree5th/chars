@@ -2,7 +2,7 @@
 .equiv FPS, 24
 
 .equiv CONTENT_WIDTH, 12
-.equiv CONTENT_HEIGHT, 20
+.equiv CONTENT_HEIGHT, 15
 
 #  elem = part of items
 #   struct elem {
@@ -22,6 +22,7 @@
 .equiv ELEM_OFFSET_ITEM, ELEM_OFFSET_COUNT + 2
 
 .equiv CLEAR_CHAR, ' '
+.equiv REF_CHAR, '.'
 
 .equiv CHAR_DOWN, 's'
 .equiv CHAR_LEFT, 'a'
@@ -39,3 +40,5 @@
 # score
  .equiv SCORE_ROW, BORDER_START_ROW + AREA_WIDTH / 2
  .equiv SCORE_COL, BORDER_START_COL - 5
+ .equiv README_ROW, 1
+ .equiv README_COL, 1

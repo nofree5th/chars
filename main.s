@@ -8,8 +8,12 @@
 #=======================
     term_fd: .int 1
     term   : .asciz "/dev/tty"
+    readme : .asciz "<a>: turn left, <d>: turn right, <s>: move down, <w>: rotate
+<r>: show|hide reference, <q>: quit"
+    .equiv README_LEN, . - readme
 
     # game data
+    show_ref: .word 0
     score  : .word 0
 
     .p2align 1,,
@@ -19,6 +23,7 @@
     now_elem_row: .word ELEM_START_ROW
     now_elem_col: .word ELEM_START_COL
     now_elem_style: .long elem_style1
+
 
     now_speed: .word FPS
     now_speed_counter: .word 0
@@ -231,8 +236,11 @@ merge_row_again:
     std
     rep movsb
 
-    movb $1, %dl
     call render_item_map
+    mov $(4000 / FPS), %eax
+    push %ebx
+    call msleep
+    pop %ebx
 
     # check current row again(ecx no need add)
     # esi set from edi
@@ -286,7 +294,6 @@ next_elem_style:
     div %bx
     movzwl %dx, %ebx
     movl elem_style_list(, %ebx, 4), %esi
-    movl $elem_style4_1, %esi
     movw $ELEM_START_ROW, now_elem + ELEM_OFFSET_ROW
     movw $ELEM_START_COL, now_elem + ELEM_OFFSET_COL
     lea now_elem + ELEM_OFFSET_COUNT, %edi
@@ -317,7 +324,6 @@ render_now_elem:
 
 #-----------------------
 # func render_item_map
-# need_clear(dl != 0)
 .type render_item_map, @function
 render_item_map:
     mov $BORDER_START_ROW, %ax
@@ -336,18 +342,22 @@ render_col_again:
     movb map_item(%esi), %cl
     cmpb $0, %cl
     jne show_item
-    cmpb $0, %dl
-    je no_need_clear_empty_item
+    cmpw $0, show_ref
+    je clear_empty_item
+    movb $REF_CHAR, %cl
+    jmp show_item
+clear_empty_item:
     movb $CLEAR_CHAR, %cl
 show_item:
     push %ax
     push %bx
+    push %dx
     push %esi
     call putchar
     pop %esi
+    pop %dx
     pop %bx
     pop %ax
-no_need_clear_empty_item:
     pop %ecx
     loop render_col_again
     pop %ecx
@@ -394,14 +404,14 @@ check_elem_pos_again:
     # row
     cmpw $BORDER_START_ROW, %ax
     jng out_of_range
-    cmpw $(BORDER_START_ROW + AREA_HEIGHT - 1), %ax
-    jge pos_not_leage
+    cmpw $(BORDER_START_ROW + CONTENT_HEIGHT), %ax
+    jg pos_not_leage
 
     # col
     cmpw $BORDER_START_COL, %bx
     jng out_of_range
-    cmpw $(BORDER_START_COL + AREA_WIDTH - 1), %bx
-    jge out_of_range
+    cmpw $(BORDER_START_COL + CONTENT_WIDTH), %bx
+    jg out_of_range
 
   # check is pos mapped item
     push %ecx
@@ -493,14 +503,19 @@ generate_next:
 game_loop:
     call next_elem_style
     call clear_screen
+
+    mov $README_ROW, %ax
+    mov $README_COL, %bx
+    call set_cursor_pos
+    write term_fd, $readme, $README_LEN
+
 game_loop_again:
 
   # render
     call render_stat
     call render_border
-    call render_now_elem
-    xor %dl, %dl
     call render_item_map
+    call render_now_elem
 
     mov $(1000 / FPS), %eax
     call msleep
@@ -514,6 +529,10 @@ game_loop_again:
 1:
     cmpb $'q', %al
     je quit
+    cmpb $'r', %al
+    jne no_switch_ref
+    notw show_ref
+no_switch_ref:
 
   # process timer(game auto down)
     movw now_speed, %cx
