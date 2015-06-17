@@ -24,6 +24,7 @@
 .equiv CLEAR_CHAR, ' '
 .equiv REF_CHAR, '.'
 
+.equiv CHAR_UP, 'w'
 .equiv CHAR_DOWN, 's'
 .equiv CHAR_LEFT, 'a'
 .equiv CHAR_RIGHT, 'd'

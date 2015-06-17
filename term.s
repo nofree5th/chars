@@ -14,6 +14,7 @@
 
 .global set_color_red
 .global set_color_green
+.global set_color_blue
 
 .data
 #=======================
@@ -29,6 +30,7 @@
     .equiv code_color_len, 5
     code_color_red: .ascii "\033[31m"
     code_color_green: .ascii "\033[32m"
+    code_color_blue: .ascii "\033[33m"
 
     last_char: .byte '?'
 
@@ -100,6 +102,13 @@ set_color_red:
 .type set_color_green, @function
 set_color_green:
     write term_fd, $code_color_green, $code_color_len
+    ret
+
+#-----------------------
+# func set_color_blue
+.type set_color_blue, @function
+set_color_blue:
+    write term_fd, $code_color_blue, $code_color_len
     ret
 
 #-----------------------

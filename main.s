@@ -13,8 +13,10 @@
     .equiv README_LEN, . - readme
 
     # game data
-    show_ref: .word 0
-    score  : .word 0
+    show_ref   : .word 0
+    score      : .word 0
+    merged_rows: .word 0
+    score_map  : .word 0, 1, 3, 6, 10
 
     .p2align 1,,
     echo_char_row: .word BORDER_START_ROW
@@ -210,6 +212,7 @@ try_merge_row_fail:
 # func try_merge
 .type try_merge, @function
 try_merge:
+    movw $0, merged_rows
     leal map_item + (CONTENT_WIDTH * CONTENT_HEIGHT) - 1, %esi
     mov $CONTENT_WIDTH, %ecx
 merge_row_again:
@@ -224,7 +227,7 @@ merge_row_again:
     je merge_end
 
     # merge_succ:
-    incw score
+    incw merged_rows
     # copy down
     mov %esi, %edi
     # edi pointer to current row end
@@ -236,6 +239,7 @@ merge_row_again:
     std
     rep movsb
 
+    movb $1, %dl
     call render_item_map
     mov $(4000 / FPS), %eax
     push %ebx
@@ -248,6 +252,32 @@ merge_row_again:
 merge_end:
     pop %ecx
     loop merge_row_again
+    movw merged_rows, %si
+    movzwl %si, %esi
+    movw score_map(,%esi,2), %cx
+    add %cx, score
+zero_score:
+    ret
+#-----------------------
+# func rotate_right
+# %edi -- pointer to elem
+.type rotate_right, @function
+rotate_right:
+    movw ELEM_OFFSET_COUNT(%edi), %cx
+    movzwl %cx, %ecx
+    # skip to item
+    addl $ELEM_OFFSET_ITEM, %edi
+rotate_again:
+    movw (%edi), %ax
+    movw 2(%edi), %bx
+
+    movw %bx, (%edi)
+    neg %ax
+    movw %ax, 2(%edi)
+
+    # skip row/col offset
+    addl $4, %edi
+    loop rotate_again
     ret
 
 #-----------------------
@@ -257,7 +287,6 @@ map_now_elem:
     lea now_elem, %esi
     movw ELEM_OFFSET_ROW(%esi), %ax
     movw ELEM_OFFSET_COL(%esi), %bx
-    movw ELEM_OFFSET_COUNT(%esi), %di
     movw ELEM_OFFSET_COUNT(%esi), %cx
     movzwl %cx, %ecx
     # skip to item
@@ -324,8 +353,12 @@ render_now_elem:
 
 #-----------------------
 # func render_item_map
+# dl -- is need clear
 .type render_item_map, @function
 render_item_map:
+    push %dx
+    call set_color_blue
+    pop %dx
     mov $BORDER_START_ROW, %ax
     mov $AREA_HEIGHT - 2, %ecx
     mov $-1, %esi
@@ -347,6 +380,8 @@ render_col_again:
     movb $REF_CHAR, %cl
     jmp show_item
 clear_empty_item:
+    cmpb $0, %dl
+    je no_clear_empty_item
     movb $CLEAR_CHAR, %cl
 show_item:
     push %ax
@@ -358,6 +393,7 @@ show_item:
     pop %dx
     pop %bx
     pop %ax
+no_clear_empty_item:
     pop %ecx
     loop render_col_again
     pop %ecx
@@ -463,8 +499,15 @@ process_cmd:
     je turn_right
     cmpb $CHAR_DOWN, %al
     je go_down
+    cmpb $CHAR_UP, %al
+    je do_rotate_right
     # TODO MORE
     ret
+do_rotate_right:
+    push %edi
+    call rotate_right
+    pop %edi
+    jmp try_execute
 go_down:
     incw ELEM_OFFSET_ROW(%edi)
     jmp try_execute
@@ -514,6 +557,7 @@ game_loop_again:
   # render
     call render_stat
     call render_border
+    xor %dl, %dl
     call render_item_map
     call render_now_elem
 
